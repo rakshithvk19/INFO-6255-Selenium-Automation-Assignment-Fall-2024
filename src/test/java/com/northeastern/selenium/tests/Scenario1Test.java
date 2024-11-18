@@ -27,32 +27,26 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.openqa.selenium.WebDriver;
+import org.apache.poi.ss.usermodel.Cell;
 
 
 public class Scenario1Test extends BaseTest {
 
     @Test
     public void downloadTranscript() throws Exception {
-        // File path for the Excel sheet containing test data
         String excelFilePath = "C:\\Users\\raksh\\Desktop\\Selenium Assignment\\Scenario_1.xlsx";
-        // Declare a Map to store the credentials
         Map<String, String> credentials;
 
-        // Create a new test in the Extent Report
         ReportManager.test = ReportManager.extent.createTest("Download Latest Transcript");
 
-        // Navigate to the Northeastern portal
         driver.get("https://me.northeastern.edu");
         driver.manage().window().maximize();
         Thread.sleep(2000);
 
-        // Take screenshot of initial page
         ScreenshotUtil.takeScreenshot(driver, "Scenario1", "InitialPage");
 
-        // Log the start of login process
         Reporter.log("Login Started", true);
 
-        //Reading credentials from Excel
         try {
             credentials = readCredentialsFromExcel(excelFilePath);
         } catch (IOException e) {
@@ -60,161 +54,111 @@ public class Scenario1Test extends BaseTest {
             credentials = new HashMap<>();
         }
 
-        // Perform login
         loginNUPortal(credentials.get("userId"), credentials.get("password"));
         Thread.sleep(2000);
 
-        // Take screenshot after login
         ScreenshotUtil.takeScreenshot(driver, "Scenario1", "AfterLogin");
         ReportManager.test.info("After Login");
         Reporter.log("Login Completed", true);
 
-        // Handle Duo 2FA
         handleDuo2FA();
 
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        clickResourcesLink();
 
-        // Click on Resources link
         try {
-            WebElement resourcesLink = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//a[contains(text(), 'Resources')]")));
-            resourcesLink.click();
-        } catch (TimeoutException e) {
-            // If the link is not clickable, use JavaScript to click
-            WebElement resourcesLink = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//a[contains(text(), 'Resources')]")));
-            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", resourcesLink);
+            clickMyTranscriptAndSwitchWindow();
+        } catch (TimeoutException | InterruptedException e) {
+            e.printStackTrace();
         }
 
-        Thread.sleep(2000);
-        ScreenshotUtil.takeScreenshot(driver, "Scenario1", "ResourcesPage");
-        ReportManager.test.info("After ResourcesPage");
-        Reporter.log("Resources Page is visited", true);
-
-        // Click on "My Transcript" link
-        try {
-            WebElement transcriptLink = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//a[contains(text(),'My Transcript')]")));
-            transcriptLink.click();
-            Thread.sleep(2000);
-            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "08_TranscriptLink");
-            ReportManager.test.info("In TranscriptLink");
-            Reporter.log("TranscriptLink is visited", true);
-        } catch (TimeoutException e) {
-            System.out.println("Error: 'My Transcript' link not clickable within timeout period.");
-            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "TranscriptLinkError");
-            ReportManager.test.fail("Failed to click 'My Transcript' link: " + e.getMessage());
-            Reporter.log("Failed to click 'My Transcript' link", true);
-            throw e; // Re-throw the exception to stop test execution if necessary
-        }
-
-        // Switch to the new window
-        String currentWindowHandle = driver.getWindowHandle();
-        for (String windowHandle : driver.getWindowHandles()) {
-            if (!windowHandle.equals(currentWindowHandle)) {
-                driver.switchTo().window(windowHandle);
-                break;
-            }
-        }
-
-        // Login to the transcript page
-        loginTranscriptPage(driver, credentials.get("username"), credentials.get("password") );
+        loginTranscriptPage(driver, credentials.get("username"), credentials.get("password"));
         Thread.sleep(2000);
 
-        // Handle Duo 2FA
         handleDuo2FA();
-        Thread.sleep(2000);
-
-        ScreenshotUtil.takeScreenshot(driver, "Scenario1", "My Transcript Page Before");
-        ReportManager.test.info("My Transcript Page Before");
-        Reporter.log("My Transcript Page is Opened", true);
-
-        // Select options in the dropdowns
-        WebElement transcriptLevelDropdown = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("levl_id")));
-        Select transcriptLevelSelect = new Select(transcriptLevelDropdown);
-        transcriptLevelSelect.selectByVisibleText("Graduate");
-
-        WebElement transcriptTypeDropdown = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("type_id")));
-        Select transcriptTypeSelect = new Select(transcriptTypeDropdown);
-        transcriptTypeSelect.selectByVisibleText("Audit Transcript");
-
-        Thread.sleep(2000);
-        ScreenshotUtil.takeScreenshot(driver, "Scenario1", "10_SelectedTranscriptOptions");
-        ReportManager.test.info("Selected Transcript Options");
-        Reporter.log("Selected Transcript Options", true);
-
-        // Click on Submit button to generate the transcript
-        WebElement submitTranscriptButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//input[@value='Submit']")));
-        submitTranscriptButton.click();
-        Thread.sleep(2000);
-
-        ScreenshotUtil.takeScreenshot(driver, "Scenario1", "Submitted Transcript Request");
-        ReportManager.test.info("Submit Transcript Request");
-        Reporter.log("Submit Transcript Request", true);
-
-        // Generate and save PDF
-        try {
-            Map<String, Object> params = new HashMap<>();
-            params.put("paperWidth", 8.27);
-            params.put("paperHeight", 11.69);
-            params.put("printBackground", true);
-            String pdfBase64 = (String) ((ChromeDriver) driver).executeCdpCommand("Page.printToPDF", params).get("data");
-
-            // Check if PDF data was generated
-            if (pdfBase64 == null || pdfBase64.isEmpty()) {
-                throw new IOException("PDF data is null or empty. Failed to generate PDF.");
-            }
-
-            // Decode and save the PDF file
-            try (FileOutputStream fileOutputStream = new FileOutputStream("transcript.pdf")) {
-                fileOutputStream.write(Base64.getDecoder().decode(pdfBase64));
-            }
-
-            Thread.sleep(2000);
-            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "PDF Saved");
-            ReportManager.test.pass("PDF Saved");
-            Reporter.log("PDF Saved", true);
-        } catch (Exception e) {
-            System.out.println("Exception occurred: " + e);
-            ReportManager.test.fail("Exception occurred: " + e);
-        }
+        
+        handleTranscriptDownload();
     }
 
     /**
-     * Reads credentials from an Excel sheet
-     * @param filePath Path to the Excel file
-     * @return Map containing userId, password, username
+     * Reads credentials from an Excel file.
+     *
+     * @param filePath The path to the Excel file containing credentials.
+     * @return A Map containing the credentials (userId, password, username).
+     * @throws IOException If there's an error reading the file or accessing its contents.
      */
     public Map<String, String> readCredentialsFromExcel(String filePath) throws IOException {
         Map<String, String> credentials = new HashMap<>();
-        try (FileInputStream fis = new FileInputStream(filePath);
-            Workbook workbook = new XSSFWorkbook(fis)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            Row row = sheet.getRow(1); // Assuming credentials are in the second row
-            credentials.put("userId", row.getCell(0).getStringCellValue());
-            credentials.put("password", row.getCell(1).getStringCellValue());
-            credentials.put("username", row.getCell(2).getStringCellValue());
+        FileInputStream fis = null;
+        Workbook workbook = null;
 
+        try {
+            // Open the Excel file
+            fis = new FileInputStream(filePath);
+            workbook = new XSSFWorkbook(fis);
+
+            // Get the first sheet
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // Assume credentials are in the second row (index 1)
+            Row row = sheet.getRow(1);
+
+            // Read credentials from cells and handle potential null values
+            credentials.put("userId", getCellValueSafely(row.getCell(0)));
+            credentials.put("password", getCellValueSafely(row.getCell(1)));
+            credentials.put("username", getCellValueSafely(row.getCell(2)));
+
+        } catch (IOException e) {
+            // Log the error (replace with your preferred logging mechanism)
+            System.err.println("Error reading Excel file: " + e.getMessage());
+            throw e; // Re-throw the exception to be handled by the caller
+        } finally {
+            // Close resources in finally block to ensure they are always closed
+            if (workbook != null) {
+                try {
+                    workbook.close();
+                } catch (IOException e) {
+                    System.err.println("Error closing workbook: " + e.getMessage());
+                }
+            }
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    System.err.println("Error closing file input stream: " + e.getMessage());
+                }
+            }
         }
+
         return credentials;
     }
 
     /**
-     * Performs the login process in northeastern Portal
+     * Safely gets the string value from a cell, handling null and non-string types.
      *
-     * @param userId The userId for login
-     * @param password The password for login
-     * @throws InterruptedException If the thread is interrupted during sleep
-     * @throws IOException If an I/O error occurs
+     * @param cell The cell to read from.
+     * @return The cell's string value, or an empty string if the cell is null or not a string.
      */
+    private String getCellValueSafely(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+        try {
+            return cell.getStringCellValue();
+        } catch (IllegalStateException e) {
+            // If the cell is not a string, convert it to a string
+            return String.valueOf(cell.getNumericCellValue());
+        }
+    }
+
     private void loginNUPortal(String userId, String password) throws InterruptedException, IOException {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 
         try {
-            // Enter userId
             WebElement userIdInput = wait.until(ExpectedConditions.elementToBeClickable(By.id("i0116")));
             userIdInput.clear();
             userIdInput.sendKeys(userId);
-            Thread.sleep(2_000);
+            Thread.sleep(2000);
 
-            // Click "Next" after entering userId
             WebElement nextButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("idSIButton9")));
             nextButton.click();
         } catch (Exception e) {
@@ -222,16 +166,12 @@ public class Scenario1Test extends BaseTest {
             e.printStackTrace();
         }
 
-        // Wait for password field and enter password
         try {
             WebElement passwordInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("i0118")));
             passwordInput.clear();
             passwordInput.sendKeys(password);
+            Thread.sleep(2000);
 
-            // Add a small delay to ensure the password is entered
-            Thread.sleep(2_000);
-
-            // Click "Sign in" after entering password
             WebElement signInButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("idSIButton9")));
             signInButton.click();
         } catch (TimeoutException e) {
@@ -241,31 +181,20 @@ public class Scenario1Test extends BaseTest {
         }
     }
 
-    /**
-     * Performs the login process for the transcript page
-     *
-     * @param username The username for login
-     * @param password The password for login
-     * @throws InterruptedException If the thread is interrupted during sleep
-     * @throws IOException If an I/O error occurs
-     */
     private void loginTranscriptPage(WebDriver driver, String username, String password) throws InterruptedException, IOException {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 
         try {
-            // Enter username
             WebElement usernameInput = wait.until(ExpectedConditions.elementToBeClickable(By.id("username")));
             usernameInput.clear();
             usernameInput.sendKeys(username);
             Thread.sleep(2000);
 
-            // Enter password
             WebElement passwordInput = wait.until(ExpectedConditions.elementToBeClickable(By.id("password")));
             passwordInput.clear();
             passwordInput.sendKeys(password);
             Thread.sleep(2000);
 
-            // Click "Login" button
             WebElement loginButton = wait.until(ExpectedConditions.elementToBeClickable(By.name("_eventId_proceed")));
             loginButton.click();
         } catch (Exception e) {
@@ -275,15 +204,9 @@ public class Scenario1Test extends BaseTest {
         }
     }
 
-    /**
-     * Handles the Duo 2-Factor Authentication process
-     *
-     * @throws InterruptedException If the thread is interrupted during sleep
-     */
     private void handleDuo2FA() throws InterruptedException {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
-        // Check if we're on the "Is this your device?" page
         try {
             WebElement trustDeviceButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("trust-browser-button")));
             trustDeviceButton.click();
@@ -293,56 +216,172 @@ public class Scenario1Test extends BaseTest {
         }
 
         try {
-            // Wait for the Duo iframe to be present
             WebElement duoIframe = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("duo_iframe")));
-
-            // Switch to the Duo iframe
             driver.switchTo().frame(duoIframe);
             System.out.println("Switched to Duo iframe");
 
-            // Look for the "Send Me a Push" button
             WebElement sendPushButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//button[contains(text(), 'Send Me a Push') or contains(@class, 'positive auth-button')]")));
             sendPushButton.click();
             System.out.println("Clicked 'Send Me a Push' button");
 
-            // Wait for manual approval (you'll need to approve on your device)
             Thread.sleep(20000);
 
-            // Switch back to the default content
             driver.switchTo().defaultContent();
             System.out.println("Switched back to default content");
         } catch (TimeoutException e) {
             System.out.println("Duo authentication prompt did not appear, continuing...");
-            // System.out.println("Page source: " + driver.getPageSource());
-            // throw e;
         }
 
-        // Handle "Stay signed in?" prompt if it appears
         try {
             WebElement staySignedIncCheckbox = wait.until(ExpectedConditions.elementToBeClickable(By.id("KmsiCheckboxField")));
             if (!staySignedIncCheckbox.isSelected()) {
                 staySignedIncCheckbox.click();
             }
             System.out.println("Stay signed in is now checked");
-            Thread.sleep(2_000);
+            Thread.sleep(2000);
 
             WebElement yesButton = wait.until(ExpectedConditions.elementToBeClickable(By.id("idSIButton9")));
             yesButton.click();
             System.out.println("Clicked on Yes button");
-            Thread.sleep(2_000);
-
+            Thread.sleep(2000);
         } catch (TimeoutException e) {
             System.out.println("'Stay signed in?' prompt did not appear. Continuing...");
-            // throw e;
         }
 
-        // Check for any additional prompts or elements after authentication
         try {
             WebElement additionalPrompt = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//button[contains(text(), 'Continue') or contains(text(), 'Proceed')]")));
             additionalPrompt.click();
             System.out.println("Clicked additional prompt after authentication");
         } catch (TimeoutException e) {
             System.out.println("No additional prompts found after authentication");
+        }
+    }
+
+    private void clickResourcesLink() throws InterruptedException {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        try {
+            WebElement resourcesLink = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//a[contains(text(), 'Resources')]")));
+            resourcesLink.click();
+        } catch (TimeoutException e) {
+            WebElement resourcesLink = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//a[contains(text(), 'Resources')]")));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", resourcesLink);
+        }
+
+        Thread.sleep(2000);
+        try{
+            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "ResourcesPage");
+            ReportManager.test.info("After ResourcesPage");
+            Reporter.log("Resources Page is visited", true);
+        }catch(IOException e){
+             System.out.println(e.getMessage());
+        }
+    }
+
+    private void clickMyTranscriptAndSwitchWindow() throws InterruptedException, TimeoutException,IOException {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        try {
+            WebElement transcriptLink = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//a[contains(text(),'My Transcript')]")));
+            transcriptLink.click();
+            Thread.sleep(2000);
+            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "08_TranscriptLink");
+            ReportManager.test.info("In TranscriptLink");
+            Reporter.log("TranscriptLink is visited", true);
+        } catch (Exception e) {
+            System.out.println("Error: 'My Transcript' link not clickable within timeout period.");
+            ScreenshotUtil.takeScreenshot(driver, "Scenario1", "TranscriptLinkError");
+            ReportManager.test.fail("Failed to click 'My Transcript' link: " + e.getMessage());
+            Reporter.log("Failed to click 'My Transcript' link", true);
+            throw e;
+        }
+
+        String currentWindowHandle = driver.getWindowHandle();
+        for (String windowHandle : driver.getWindowHandles()) {
+            if (!windowHandle.equals(currentWindowHandle)) {
+                driver.switchTo().window(windowHandle);
+                break;
+            }
+        }
+    }
+
+    private void handleTranscriptDownload() throws InterruptedException, IOException {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        try {
+            captureScreenshotAndLog("My Transcript Page Before", "My Transcript Page is Opened");
+            selectTranscriptOptions(wait);
+            submitTranscriptRequest(wait);
+            generateAndSavePDF();
+        } catch (IOException e) {
+            System.out.println("Error during transcript download process: " + e.getMessage());
+            ReportManager.test.fail("Error during transcript download process: " + e.getMessage());
+        }
+    }
+
+    private void selectTranscriptOptions(WebDriverWait wait) throws InterruptedException, IOException {
+        Select transcriptLevelSelect = new Select(wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("levl_id"))));
+        transcriptLevelSelect.selectByVisibleText("Graduate");
+
+        Select transcriptTypeSelect = new Select(wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("type_id"))));
+        transcriptTypeSelect.selectByVisibleText("Audit Transcript");
+
+        Thread.sleep(2000);
+        
+        try {
+            captureScreenshotAndLog("10_SelectedTranscriptOptions", "Selected Transcript Options");
+        } catch (Exception e) {
+            System.out.println("Error capturing screenshot for transcript options: " + e.getMessage());
+            ReportManager.test.fail("Error capturing screenshot for transcript options: " + e.getMessage());
+        }
+    }
+
+    private void submitTranscriptRequest(WebDriverWait wait) throws InterruptedException, IOException {
+        WebElement submitTranscriptButton = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//input[@value='Submit']")));
+        submitTranscriptButton.click();
+        Thread.sleep(2000);
+        
+        try {
+            captureScreenshotAndLog("Submitted Transcript Request", "Submit Transcript Request");
+        } catch (Exception e) {
+            System.out.println("Error capturing screenshot for transcript request submission: " + e.getMessage());
+            ReportManager.test.fail("Error capturing screenshot for transcript request submission: " + e.getMessage());
+        }
+    }
+
+    private void generateAndSavePDF() throws InterruptedException {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("paperWidth", 8.27);
+            params.put("paperHeight", 11.69);
+            params.put("printBackground", true);
+            String pdfBase64 = (String) ((ChromeDriver) driver).executeCdpCommand("Page.printToPDF", params).get("data");
+
+            if (pdfBase64 == null || pdfBase64.isEmpty()) {
+                throw new IOException("PDF data is null or empty. Failed to generate PDF.");
+            }
+
+            try (FileOutputStream fileOutputStream = new FileOutputStream("transcript.pdf")) {
+                fileOutputStream.write(Base64.getDecoder().decode(pdfBase64));
+            }
+
+            Thread.sleep(2000);
+            captureScreenshotAndLog("PDF Saved", "PDF Saved");
+            ReportManager.test.pass("PDF Saved");
+        } catch (IOException e) {
+            System.out.println("Error generating or saving PDF: " + e.getMessage());
+            ReportManager.test.fail("Error generating or saving PDF: " + e.getMessage());
+        }
+    }
+
+    private void captureScreenshotAndLog(String screenshotName, String logMessage) {
+        try {
+            ScreenshotUtil.takeScreenshot(driver, "Scenario1", screenshotName);
+            ReportManager.test.info(logMessage);
+            Reporter.log(logMessage, true);
+        } catch (IOException e) {
+            System.out.println("Error capturing screenshot: " + e.getMessage());
+            ReportManager.test.fail("Failed to capture screenshot: " + e.getMessage());
         }
     }
 }
