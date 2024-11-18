@@ -1,0 +1,12 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="Selenium Assignment Suite">
+    <test name="All Scenarios">
+        <classes>
+            <class name="com.northeastern.selenium.tests.Scenario1Test"/>
+            <class name="com.northeastern.selenium.tests.Scenario2Test"/>
+            <class name="com.northeastern.selenium.tests.Scenario3Test"/>
+            <class name="com.northeastern.selenium.tests.Scenario4Test"/>
+            <class name="com.northeastern.selenium.tests.Scenario5Test"/>
+        </classes>
+    </test>
+</suite>
